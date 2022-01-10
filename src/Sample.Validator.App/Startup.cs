@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 using FluentValidation;
@@ -40,10 +42,14 @@ namespace Sample.Validator.App
             services.AddTransient<IValidatorInterceptor, ValidatorInterceptor>();
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
-            services.AddControllers(options =>
-            {
-                options.Filters.Add<ApiExceptionHandlerFilter>();
-            })
+services.AddControllers(options =>
+{
+options.Filters.Add<ApiExceptionHandlerFilter>();
+})
+.AddJsonOptions(options => 
+{
+    options.JsonSerializerOptions.Converters.Add(new GuidJsonConverter());
+})
                 .ConfigureApiBehaviorOptions(options =>
                 {
                     options.InvalidModelStateResponseFactory = actionContext =>
@@ -104,4 +110,24 @@ namespace Sample.Validator.App
             });
         }
     }
+
+public class GuidJsonConverter : System.Text.Json.Serialization.JsonConverter<Guid>
+{
+    public override Guid Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var stringValue = reader.GetString();
+        var guidValue = Guid.Empty;
+        if(!Guid.TryParse(stringValue, out guidValue))
+        {
+            throw new Exception("Invaild format value detected.");
+        }
+
+        return guidValue;
+    }
+
+    public override void Write(Utf8JsonWriter writer, Guid value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
+    }
+}
 }
